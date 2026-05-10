@@ -1,29 +1,31 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from recommender import get_recommendations
+from typing import List
 
 app = FastAPI()
 
+class OccupancySlot(BaseModel):
+    time_slot: str
+    occupancy_level: int
 
-class RecommendationRequest(BaseModel):
-    days: list[str]
-    start_hour: int
-    end_hour: int
+class OccupancyResponse(BaseModel):
+    location_id: str
+    slots: List[OccupancySlot]
 
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
-
-
-@app.post("/recommendations")
-def recommendations(request: RecommendationRequest):
+@app.get("/api/occupancy", response_model=OccupancyResponse)
+async def get_occupancy(location_id: str):
     try:
-        results = get_recommendations(
-            request.days,
-            request.start_hour,
-            request.end_hour
-        )
-        return {"recommendations": results}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        data = {
+            "location_id": location_id,
+            "slots": [
+                {"time_slot": "09:00", "occupancy_level": 30},
+                {"time_slot": "10:00", "occupancy_level": 60},
+            ],
+        }
+        if "slots" not in data or not isinstance(data["slots"], list):
+            raise ValueError("Invalid data format: 'slots' missing or not a list")
+        return data
+    except ValueError as ve:
+        raise HTTPException(status_code=500, detail=f"Data error: {str(ve)}")
+    except Exception:
+        raise HTTPException(status_code=500, detail="Internal server error")
